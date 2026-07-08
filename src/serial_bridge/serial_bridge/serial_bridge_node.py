@@ -1,52 +1,75 @@
+import time
+import serial
+
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
-import serial
-import time
+
+from serial_bridge.protocol import build_cmd_vel_packet
 
 
-class SerialBridge(Node):
+class SerialBridgeNode(Node):
     def __init__(self):
         super().__init__('serial_bridge')
 
         self.declare_parameter('port', '/dev/ttyACM0')
         self.declare_parameter('baudrate', 115200)
+        self.declare_parameter('timeout', 0.1)
 
-        port = self.get_parameter('port').value
-        baudrate = self.get_parameter('baudrate').value
+        self.port = self.get_parameter('port').value
+        self.baudrate = int(self.get_parameter('baudrate').value)
+        self.timeout = float(self.get_parameter('timeout').value)
 
-        try:
-            self.ser = serial.Serial(port, baudrate, timeout=0.1)
-            time.sleep(2.0)
-            self.get_logger().info(f'Connected to Arduino: {port}, {baudrate}')
-        except Exception as e:
-            self.ser = None
-            self.get_logger().error(f'Failed to open serial port {port}: {e}')
+        self.serial_port = None
+        self.open_serial()
 
-        self.sub = self.create_subscription(
+        self.cmd_sub = self.create_subscription(
             Twist,
             '/cmd_vel',
-            self.cmd_callback,
+            self.cmd_vel_callback,
             10
         )
 
-    def cmd_callback(self, msg):
-        vx = msg.linear.x
-        vy = msg.linear.y
-        wz = msg.angular.z
+        self.get_logger().info('serial_bridge node started')
 
-        command = f'CMD,{vx:.3f},{vy:.3f},{wz:.3f}\n'
+    def open_serial(self):
+        try:
+            self.serial_port = serial.Serial(
+                self.port,
+                self.baudrate,
+                timeout=self.timeout
+            )
+            time.sleep(2.0)
+            self.get_logger().info(
+                f'Connected to Arduino on {self.port} @ {self.baudrate}'
+            )
+        except Exception as exc:
+            self.serial_port = None
+            self.get_logger().error(
+                f'Failed to open serial port {self.port}: {exc}'
+            )
 
-        if self.ser and self.ser.is_open:
-            self.ser.write(command.encode('utf-8'))
-            self.get_logger().info(f'SEND: {command.strip()}')
-        else:
-            self.get_logger().warn(f'Serial not open. Drop: {command.strip()}')
+    def cmd_vel_callback(self, msg: Twist):
+        packet = build_cmd_vel_packet(
+            msg.linear.x,
+            msg.linear.y,
+            msg.angular.z
+        )
+
+        if self.serial_port is None or not self.serial_port.is_open:
+            self.get_logger().warn(f'Serial not open, drop packet: {packet.strip()}')
+            return
+
+        try:
+            self.serial_port.write(packet.encode('utf-8'))
+            self.get_logger().info(f'SEND: {packet.strip()}')
+        except Exception as exc:
+            self.get_logger().error(f'Failed to write serial packet: {exc}')
 
 
 def main(args=None):
     rclpy.init(args=args)
-    node = SerialBridge()
+    node = SerialBridgeNode()
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()

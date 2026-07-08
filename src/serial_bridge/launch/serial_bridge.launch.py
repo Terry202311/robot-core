@@ -14,6 +14,6 @@ def generate_launch_description():
             executable='serial_bridge_node',
             name='serial_bridge',
             output='screen',
-            parameters=[config_file]
+            parameters=[config_file],
         )
     ])

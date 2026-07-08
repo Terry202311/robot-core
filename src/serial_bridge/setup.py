@@ -1,12 +1,12 @@
 from setuptools import setup
-import os
 from glob import glob
+import os
 
 package_name = 'serial_bridge'
 
 setup(
     name=package_name,
-    version='0.0.1',
+    version='0.1.0',
     packages=[package_name],
     data_files=[
         ('share/ament_index/resource_index/packages',
@@ -19,8 +19,8 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='ubuntu',
-    maintainer_email='ubuntu@todo.todo',
+    maintainer='OpenRobotPlatform',
+    maintainer_email='opensource@openrobotplatform.org',
     description='ROS2 serial bridge for Arduino Mega2560',
     license='MIT',
     entry_points={
