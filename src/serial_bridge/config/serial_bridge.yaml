@@ -2,4 +2,6 @@ serial_bridge:
   ros__parameters:
     port: "/dev/ttyACM0"
     baudrate: 115200
-    timeout: 0.1
+    timeout: 0.02
+    read_period: 0.01
+    reconnect_period: 2.0

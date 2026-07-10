@@ -1,16 +1,23 @@
 <?xml version="1.0"?>
 <package format="3">
   <name>serial_bridge</name>
-  <version>0.1.0</version>
-  <description>ROS2 serial bridge between Raspberry Pi 4 and Arduino Mega2560.</description>
+  <version>0.2.0</version>
 
-  <maintainer email="opensource@openrobotplatform.org">OpenRobotPlatform</maintainer>
+  <description>
+    Bidirectional ROS2 serial bridge between Raspberry Pi 4 and Arduino Mega2560.
+  </description>
+
+  <maintainer email="opensource@openrobotplatform.org">
+    OpenRobotPlatform
+  </maintainer>
+
   <license>MIT</license>
 
   <buildtool_depend>ament_python</buildtool_depend>
 
   <depend>rclpy</depend>
   <depend>geometry_msgs</depend>
+  <depend>std_msgs</depend>
 
   <exec_depend>python3-serial</exec_depend>
   <exec_depend>launch</exec_depend>
