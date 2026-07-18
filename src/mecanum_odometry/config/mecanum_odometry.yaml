@@ -1,0 +1,22 @@
+mecanum_odometry:
+  ros__parameters:
+    wheel_radius: 0.040
+    encoder_cpr: 1248.0
+
+    # Initial estimated dimensions.
+    # Replace with measured wheel-center distances later.
+    wheel_base: 0.165
+    wheel_track: 0.130
+
+    encoder_topic: "/wheel_encoder_counts"
+    wheel_speed_topic: "/wheel_speeds"
+    odom_topic: "/odom"
+
+    odom_frame: "odom"
+    base_frame: "base_link"
+
+    publish_tf: true
+
+    # Change to -1.0 if lateral or rotational odometry is reversed.
+    lateral_sign: 1.0
+    yaw_sign: 1.0

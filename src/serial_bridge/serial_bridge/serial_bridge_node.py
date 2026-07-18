@@ -1,5 +1,6 @@
 import time
 from typing import Optional
+from std_msgs.msg import Int32
 
 import serial
 
@@ -43,6 +44,32 @@ class SerialBridgeNode(Node):
             10,
         )
 
+        # 单轮测试接口
+        self.wheel_test_sub = self.create_subscription(
+            Int32,
+            '/wheel_test',
+            self.wheel_test_callback,
+            10
+        )
+
+        # 单轮测试状态
+        self.wheel_test_active = False
+        self.wheel_test_command = 0
+        self.wheel_test_last_time = 0.0
+
+        # 最长允许单轮连续运行时间
+        self.wheel_test_timeout = 10.0
+
+        # 每 0.1 秒检查测试超时
+        self.wheel_test_watchdog_timer = self.create_timer(
+            0.1,
+            self.wheel_test_watchdog
+        )
+
+        self.get_logger().info(
+            'Wheel test enabled: 0=STOP, 1=LF, 2=RF, 3=LB, 4=RB'
+        )
+
         self.encoder_pub = self.create_publisher(
             Int64MultiArray,
             '/wheel_encoder_counts',
@@ -74,6 +101,10 @@ class SerialBridgeNode(Node):
             self.serial_port.reset_input_buffer()
             self.serial_port.reset_output_buffer()
 
+            # 串口连接后先确保所有电机停止
+            self.serial_port.write(b'S\n')
+            self.serial_port.flush()
+
             self.get_logger().info(
                 f'Connected to Arduino: '
                 f'{self.port} @ {self.baudrate}'
@@ -93,7 +124,7 @@ class SerialBridgeNode(Node):
         now = time.monotonic()
 
         if now - self.last_reconnect_attempt >= self.reconnect_period:
-            self.get_logger().warn(
+            self.get_logger().warning(
                 f'Trying to reconnect serial port {self.port}'
             )
             self.open_serial()
@@ -103,10 +134,120 @@ class SerialBridgeNode(Node):
             and self.serial_port.is_open
         )
 
+    def send_serial_command(self, command: str) -> bool:
+        """安全地向 Arduino 发送一条命令。"""
+        if not self.ensure_serial_connected():
+            self.get_logger().error(
+                f'Cannot send command {command!r}: serial port disconnected'
+            )
+            return False
+
+        try:
+            if not command.endswith('\n'):
+                command += '\n'
+
+            self.serial_port.write(command.encode('utf-8'))
+            self.serial_port.flush()
+            return True
+
+        except serial.SerialException as exc:
+            self.get_logger().error(
+                f'Failed to send serial command {command!r}: {exc}'
+            )
+            self.close_serial()
+            return False
+
+    def wheel_test_callback(self, msg: Int32) -> None:
+        """
+        /wheel_test:
+          0 = stop
+          1 = LF
+          2 = RF
+          3 = LB
+          4 = RB
+        """
+        command_map = {
+            0: 'S',
+            1: '1',
+            2: '2',
+            3: '3',
+            4: '4',
+        }
+
+        wheel_names = {
+            0: 'STOP',
+            1: 'LF',
+            2: 'RF',
+            3: 'LB',
+            4: 'RB',
+        }
+
+        command = command_map.get(msg.data)
+
+        if command is None:
+            self.get_logger().warning(
+                f'Invalid /wheel_test value: {msg.data}; '
+                'valid values are 0, 1, 2, 3, 4'
+            )
+            return
+
+        if msg.data == 0:
+            self.send_serial_command('S')
+            self.wheel_test_active = False
+            self.wheel_test_command = 0
+            self.get_logger().info('Wheel test stopped')
+            return
+
+        if self.send_serial_command(command):
+            self.wheel_test_active = True
+            self.wheel_test_command = msg.data
+            self.wheel_test_last_time = time.monotonic()
+
+            self.get_logger().warning(
+                f'Wheel test started: {wheel_names[msg.data]}; '
+                f'auto-stop after {self.wheel_test_timeout:.1f} seconds'
+            )
+
+    def wheel_test_watchdog(self) -> None:
+        """单轮测试超时自动停车。"""
+        if not self.wheel_test_active:
+            return
+
+        elapsed = time.monotonic() - self.wheel_test_last_time
+
+        if elapsed >= self.wheel_test_timeout:
+            self.send_serial_command('S')
+            self.wheel_test_active = False
+            self.wheel_test_command = 0
+
+            self.get_logger().warning(
+                'Wheel test timed out; motor stopped automatically'
+            )
+
     def cmd_vel_callback(self, msg: Twist) -> None:
         """Send ROS2 velocity commands to Arduino."""
         if not self.ensure_serial_connected():
             return
+
+        is_zero_command = (
+                abs(msg.linear.x) < 1e-6
+                and abs(msg.linear.y) < 1e-6
+                and abs(msg.angular.z) < 1e-6
+        )
+
+        if self.wheel_test_active:
+            if is_zero_command:
+                # 避免周期性的零速度消息打断单轮测试
+                return
+
+            # 非零运动命令优先，退出测试模式
+            self.send_serial_command('S')
+            self.wheel_test_active = False
+            self.wheel_test_command = 0
+
+            self.get_logger().warning(
+                'Wheel test cancelled by non-zero /cmd_vel'
+            )
 
         packet = build_cmd_vel_packet(
             msg.linear.x,
@@ -116,6 +257,8 @@ class SerialBridgeNode(Node):
 
         try:
             self.serial_port.write(packet.encode('utf-8'))
+            self.serial_port.flush()
+
             self.get_logger().info(
                 f'SEND: {packet.strip()}'
             )
@@ -197,6 +340,10 @@ class SerialBridgeNode(Node):
         self.serial_port = None
 
     def destroy_node(self) -> bool:
+        if self.serial_port is not None and self.serial_port.is_open:
+            self.send_serial_command('S')
+            time.sleep(0.05)
+
         self.close_serial()
         return super().destroy_node()
 

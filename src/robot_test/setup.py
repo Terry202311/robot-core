@@ -1,9 +1,6 @@
-import os
-from glob import glob
-
 from setuptools import find_packages, setup
 
-package_name = 'serial_bridge'
+package_name = 'robot_test'
 
 setup(
     name=package_name,
@@ -18,29 +15,23 @@ setup(
             'share/' + package_name,
             ['package.xml'],
         ),
-        (
-            os.path.join('share', package_name, 'launch'),
-            glob('launch/*.launch.py'),
-        ),
-        (
-            os.path.join('share', package_name, 'config'),
-            glob('config/*.yaml'),
-        ),
     ],
-    install_requires=[
-        'setuptools',
-        'pyserial',
-    ],
+    install_requires=['setuptools'],
     zip_safe=True,
     maintainer='ubuntu',
     maintainer_email='ubuntu@todo.todo',
-    description='ROS2 serial bridge between Raspberry Pi and Arduino Mega2560',
+    description='Low-speed motion test tools for the mecanum robot',
     license='Apache-2.0',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'serial_bridge_node = '
-            'serial_bridge.serial_bridge_node:main',
+            'motion_test = robot_test.motion_test:main',
+            'forward_test = robot_test.forward_test:run',
+            'backward_test = robot_test.backward_test:run',
+            'left_test = robot_test.left_test:run',
+            'right_test = robot_test.right_test:run',
+            'rotate_left_test = robot_test.rotate_left_test:run',
+            'rotate_right_test = robot_test.rotate_right_test:run',
         ],
     },
 )

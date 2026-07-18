@@ -1,0 +1,10 @@
+mecanum_odometry:
+  ros__parameters:
+    wheel_radius: 0.040
+    wheel_base: 0.200
+    track_width: 0.180
+    counts_per_revolution: 1248.0
+
+    odom_frame: odom
+    base_frame: base_link
+    publish_tf: true
