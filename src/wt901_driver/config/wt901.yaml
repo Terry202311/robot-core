@@ -1,0 +1,6 @@
+wt901_node:
+  ros__parameters:
+    port: /dev/ttyUSB0
+    baudrate: 9600
+    frame_id: imu_link
+    topic_name: /imu/data_raw

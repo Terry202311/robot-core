@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+
+<robot
+  name="open_robot_platform"
+  xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:include filename="materials.xacro"/>
+  <xacro:include filename="base.xacro"/>
+
+</robot>
