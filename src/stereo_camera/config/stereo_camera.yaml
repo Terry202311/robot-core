@@ -1,0 +1,18 @@
+stereo_camera_node:
+  ros__parameters:
+    device: "/dev/video0"
+
+    # 当前先使用低分辨率模式：
+    # 拼接图 1280x400
+    # 单目图 640x400
+    frame_width: 1280
+    frame_height: 400
+
+    capture_fps: 60.0
+    publish_fps: 30.0
+
+    left_frame_id: "camera_left_optical_frame"
+    right_frame_id: "camera_right_optical_frame"
+
+    left_topic: "left/image_raw"
+    right_topic: "right/image_raw"
