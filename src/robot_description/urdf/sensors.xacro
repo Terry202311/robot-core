@@ -1,0 +1,67 @@
+<?xml version="1.0"?>
+
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- WT901 IMU -->
+  <link name="imu_link">
+    <visual>
+      <geometry>
+        <box size="0.040 0.030 0.012"/>
+      </geometry>
+
+      <material name="orp_gray"/>
+    </visual>
+  </link>
+
+  <joint name="imu_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="imu_link"/>
+
+    <!-- 临时位置：底盘中心上方 5 cm -->
+    <origin xyz="0 0 0.050" rpy="0 0 0"/>
+  </joint>
+
+
+  <!-- 双目相机主体坐标系 -->
+  <link name="camera_link">
+    <visual>
+      <geometry>
+        <box size="0.080 0.030 0.025"/>
+      </geometry>
+
+      <material name="orp_gray"/>
+    </visual>
+  </link>
+
+  <joint name="camera_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="camera_link"/>
+
+    <!-- 临时位置：机器人前部、高于底盘中心 12 cm -->
+    <origin xyz="0.130 0 0.120" rpy="0 0 0"/>
+  </joint>
+
+
+  <!-- 左摄像头光学坐标系 -->
+  <link name="camera_left_link"/>
+
+  <joint name="camera_left_joint" type="fixed">
+    <parent link="camera_link"/>
+    <child link="camera_left_link"/>
+
+    <!-- 临时双目基线：60 mm -->
+    <origin xyz="0 0.030 0" rpy="0 0 0"/>
+  </joint>
+
+
+  <!-- 右摄像头坐标系 -->
+  <link name="camera_right_link"/>
+
+  <joint name="camera_right_joint" type="fixed">
+    <parent link="camera_link"/>
+    <child link="camera_right_link"/>
+
+    <origin xyz="0 -0.030 0" rpy="0 0 0"/>
+  </joint>
+
+</robot>

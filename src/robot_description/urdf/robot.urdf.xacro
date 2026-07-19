@@ -6,5 +6,7 @@
 
   <xacro:include filename="materials.xacro"/>
   <xacro:include filename="base.xacro"/>
+  <xacro:include filename="wheels.xacro"/>
+  <xacro:include filename="sensors.xacro"/>
 
 </robot>

@@ -1,0 +1,100 @@
+<?xml version="1.0"?>
+
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- 轮子尺寸 -->
+  <xacro:property name="wheel_radius" value="0.040"/>
+  <xacro:property name="wheel_width" value="0.030"/>
+  <xacro:property name="wheel_mass" value="0.30"/>
+
+  <!--
+    相对于 base_link 的安装位置。
+    x：前后方向，前方为正。
+    y：左右方向，左侧为正。
+    z：高度方向。
+  -->
+  <xacro:property name="wheel_x" value="0.100"/>
+  <xacro:property name="wheel_y" value="0.145"/>
+  <xacro:property name="wheel_z" value="0.000"/>
+
+  <xacro:macro name="mecanum_wheel" params="name x y">
+
+    <link name="${name}_wheel_link">
+      <visual>
+        <!--
+          URDF 圆柱体默认轴线沿 Z 轴。
+          绕 X 轴旋转 90°，使轮轴沿 Y 轴。
+        -->
+        <origin xyz="0 0 0" rpy="${pi / 2.0} 0 0"/>
+
+        <geometry>
+          <cylinder
+            radius="${wheel_radius}"
+            length="${wheel_width}"/>
+        </geometry>
+
+        <material name="orp_dark"/>
+      </visual>
+
+      <collision>
+        <origin xyz="0 0 0" rpy="${pi / 2.0} 0 0"/>
+
+        <geometry>
+          <cylinder
+            radius="${wheel_radius}"
+            length="${wheel_width}"/>
+        </geometry>
+      </collision>
+
+      <inertial>
+        <origin xyz="0 0 0" rpy="${pi / 2.0} 0 0"/>
+
+        <mass value="${wheel_mass}"/>
+
+        <inertia
+          ixx="${wheel_mass * (3.0 * wheel_radius * wheel_radius + wheel_width * wheel_width) / 12.0}"
+          ixy="0.0"
+          ixz="0.0"
+          iyy="${wheel_mass * wheel_radius * wheel_radius / 2.0}"
+          iyz="0.0"
+          izz="${wheel_mass * (3.0 * wheel_radius * wheel_radius + wheel_width * wheel_width) / 12.0}"/>
+      </inertial>
+    </link>
+
+    <joint name="${name}_wheel_joint" type="continuous">
+      <parent link="base_link"/>
+      <child link="${name}_wheel_link"/>
+
+      <origin xyz="${x} ${y} ${wheel_z}" rpy="0 0 0"/>
+
+      <!-- 轮轴沿 Y 轴 -->
+      <axis xyz="0 1 0"/>
+    </joint>
+
+  </xacro:macro>
+
+  <!-- 前左轮 -->
+  <xacro:mecanum_wheel
+    name="front_left"
+    x="${wheel_x}"
+    y="${wheel_y}"/>
+
+  <!-- 前右轮 -->
+  <xacro:mecanum_wheel
+    name="front_right"
+    x="${wheel_x}"
+    y="${-wheel_y}"/>
+
+  <!-- 后左轮 -->
+  <xacro:mecanum_wheel
+    name="rear_left"
+    x="${-wheel_x}"
+    y="${wheel_y}"/>
+
+  <!-- 后右轮 -->
+  <xacro:mecanum_wheel
+    name="rear_right"
+    x="${-wheel_x}"
+    y="${-wheel_y}"/>
+
+</robot>
