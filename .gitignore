@@ -5,3 +5,26 @@ log/
 __pycache__/
 .vscode/
 .idea/
+
+# ROS 2 build artifacts
+build/
+install/
+log/
+
+# TF debug output
+frames_*.pdf
+frames_*.gv
+
+# Editor / temporary backup files
+*.bak
+*~
+*.swp
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# OS
+.DS_Store
+Thumbs.db
