@@ -346,10 +346,10 @@ private:
 
     // clone() gives each output image independent storage.
 cv::Mat left_color =
-  stereo_frame(left_roi).clone();
+  stereo_frame(right_roi).clone();
 
 cv::Mat right_color =
-  stereo_frame(right_roi).clone();
+  stereo_frame(left_roi).clone();
 
 
 cv::Mat left_image;
