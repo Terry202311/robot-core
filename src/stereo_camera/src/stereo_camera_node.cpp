@@ -1,4 +1,5 @@
 #include <chrono>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <stdexcept>
@@ -6,12 +7,13 @@
 
 #include <opencv2/opencv.hpp>
 
+#include "camera_info_manager/camera_info_manager.hpp"
 #include "cv_bridge/cv_bridge.h"
 #include "rclcpp/rclcpp.hpp"
+#include "sensor_msgs/image_encodings.hpp"
+#include "sensor_msgs/msg/camera_info.hpp"
 #include "sensor_msgs/msg/image.hpp"
 #include "std_msgs/msg/header.hpp"
-
-using namespace std::chrono_literals;
 
 class StereoCameraNode : public rclcpp::Node
 {
@@ -19,43 +21,79 @@ public:
   StereoCameraNode()
   : Node("stereo_camera_node")
   {
-    // Camera parameters
+    // Camera capture parameters.
     device_ = declare_parameter<std::string>("device", "/dev/video0");
     frame_width_ = declare_parameter<int>("frame_width", 1280);
     frame_height_ = declare_parameter<int>("frame_height", 400);
     capture_fps_ = declare_parameter<double>("capture_fps", 60.0);
     publish_fps_ = declare_parameter<double>("publish_fps", 30.0);
 
+    // TF frame IDs.
     left_frame_id_ = declare_parameter<std::string>(
       "left_frame_id", "camera_left_optical_frame");
 
     right_frame_id_ = declare_parameter<std::string>(
       "right_frame_id", "camera_right_optical_frame");
 
+    // Image topics.
     left_topic_ = declare_parameter<std::string>(
       "left_topic", "left/image_raw");
 
     right_topic_ = declare_parameter<std::string>(
       "right_topic", "right/image_raw");
 
-    if (frame_width_ <= 0 || frame_height_ <= 0) {
-      throw std::runtime_error("frame_width and frame_height must be positive");
-    }
+    // CameraInfo topics.
+    left_camera_info_topic_ = declare_parameter<std::string>(
+      "left_camera_info_topic", "left/camera_info");
 
-    if ((frame_width_ % 2) != 0) {
-      throw std::runtime_error(
-              "Side-by-side image width must be an even number");
-    }
+    right_camera_info_topic_ = declare_parameter<std::string>(
+      "right_camera_info_topic", "right/camera_info");
 
-    if (publish_fps_ <= 0.0) {
-      throw std::runtime_error("publish_fps must be greater than zero");
-    }
+    // Camera names and calibration file URLs.
+    left_camera_name_ = declare_parameter<std::string>(
+      "left_camera_name", "left_camera");
 
-    left_publisher_ =
+    right_camera_name_ = declare_parameter<std::string>(
+      "right_camera_name", "right_camera");
+
+    left_camera_info_url_ = declare_parameter<std::string>(
+      "left_camera_info_url", "");
+
+    right_camera_info_url_ = declare_parameter<std::string>(
+      "right_camera_info_url", "");
+
+    validate_parameters();
+
+    // Image publishers.
+    left_image_publisher_ =
       create_publisher<sensor_msgs::msg::Image>(left_topic_, 10);
 
-    right_publisher_ =
+    right_image_publisher_ =
       create_publisher<sensor_msgs::msg::Image>(right_topic_, 10);
+
+    // CameraInfo publishers.
+    left_camera_info_publisher_ =
+      create_publisher<sensor_msgs::msg::CameraInfo>(
+      left_camera_info_topic_, 10);
+
+    right_camera_info_publisher_ =
+      create_publisher<sensor_msgs::msg::CameraInfo>(
+      right_camera_info_topic_, 10);
+
+    // Calibration managers.
+    left_camera_info_manager_ =
+      std::make_unique<camera_info_manager::CameraInfoManager>(
+      this,
+      left_camera_name_,
+      left_camera_info_url_);
+
+    right_camera_info_manager_ =
+      std::make_unique<camera_info_manager::CameraInfoManager>(
+      this,
+      right_camera_name_,
+      right_camera_info_url_);
+
+    report_calibration_status();
 
     open_camera();
 
@@ -68,6 +106,7 @@ public:
 
     RCLCPP_INFO(get_logger(), "Stereo camera node started");
     RCLCPP_INFO(get_logger(), "Device: %s", device_.c_str());
+
     RCLCPP_INFO(
       get_logger(),
       "Requested side-by-side mode: %dx%d @ %.1f fps",
@@ -83,9 +122,15 @@ public:
 
     RCLCPP_INFO(
       get_logger(),
-      "Publishing: /%s and /%s",
+      "Image topics: /%s and /%s",
       left_topic_.c_str(),
       right_topic_.c_str());
+
+    RCLCPP_INFO(
+      get_logger(),
+      "CameraInfo topics: /%s and /%s",
+      left_camera_info_topic_.c_str(),
+      right_camera_info_topic_.c_str());
   }
 
   ~StereoCameraNode() override
@@ -96,6 +141,69 @@ public:
   }
 
 private:
+  void validate_parameters() const
+  {
+    if (frame_width_ <= 0 || frame_height_ <= 0) {
+      throw std::runtime_error(
+              "frame_width and frame_height must be positive");
+    }
+
+    if ((frame_width_ % 2) != 0) {
+      throw std::runtime_error(
+              "Side-by-side image width must be an even number");
+    }
+
+    if (capture_fps_ <= 0.0) {
+      throw std::runtime_error(
+              "capture_fps must be greater than zero");
+    }
+
+    if (publish_fps_ <= 0.0) {
+      throw std::runtime_error(
+              "publish_fps must be greater than zero");
+    }
+
+    if (left_frame_id_.empty() || right_frame_id_.empty()) {
+      throw std::runtime_error(
+              "Camera frame IDs must not be empty");
+    }
+  }
+
+  void report_calibration_status()
+  {
+    if (left_camera_info_manager_->isCalibrated()) {
+      const auto info = left_camera_info_manager_->getCameraInfo();
+
+      RCLCPP_INFO(
+        get_logger(),
+        "Left camera calibration loaded: %ux%u, camera=%s",
+        info.width,
+        info.height,
+        left_camera_name_.c_str());
+    } else {
+      RCLCPP_WARN(
+        get_logger(),
+        "Left camera is not calibrated. "
+        "Publishing uncalibrated CameraInfo until a valid YAML file is provided.");
+    }
+
+    if (right_camera_info_manager_->isCalibrated()) {
+      const auto info = right_camera_info_manager_->getCameraInfo();
+
+      RCLCPP_INFO(
+        get_logger(),
+        "Right camera calibration loaded: %ux%u, camera=%s",
+        info.width,
+        info.height,
+        right_camera_name_.c_str());
+    } else {
+      RCLCPP_WARN(
+        get_logger(),
+        "Right camera is not calibrated. "
+        "Publishing uncalibrated CameraInfo until a valid YAML file is provided.");
+    }
+  }
+
   void open_camera()
   {
     RCLCPP_INFO(
@@ -117,7 +225,7 @@ private:
     capture_.set(cv::CAP_PROP_FRAME_HEIGHT, frame_height_);
     capture_.set(cv::CAP_PROP_FPS, capture_fps_);
 
-    // Reduce latency where supported by the V4L2/OpenCV backend.
+    // Reduce capture latency where supported.
     capture_.set(cv::CAP_PROP_BUFFERSIZE, 1);
 
     const int actual_width =
@@ -162,6 +270,42 @@ private:
     }
   }
 
+  sensor_msgs::msg::CameraInfo prepare_camera_info(
+    camera_info_manager::CameraInfoManager & manager,
+    const std_msgs::msg::Header & header,
+    int image_width,
+    int image_height,
+    const std::string & side)
+  {
+    auto camera_info = manager.getCameraInfo();
+    camera_info.header = header;
+
+    if (!manager.isCalibrated()) {
+      // A zero intrinsic matrix indicates an uncalibrated camera.
+      camera_info.width = static_cast<uint32_t>(image_width);
+      camera_info.height = static_cast<uint32_t>(image_height);
+      camera_info.distortion_model = "plumb_bob";
+    } else if (
+      camera_info.width != static_cast<uint32_t>(image_width) ||
+      camera_info.height != static_cast<uint32_t>(image_height))
+    {
+      RCLCPP_ERROR_THROTTLE(
+        get_logger(),
+        *get_clock(),
+        5000,
+        "%s calibration resolution is %ux%u, "
+        "but current image resolution is %dx%d. "
+        "The calibration file must match the active image resolution.",
+        side.c_str(),
+        camera_info.width,
+        camera_info.height,
+        image_width,
+        image_height);
+    }
+
+    return camera_info;
+  }
+
   void capture_and_publish()
   {
     cv::Mat stereo_frame;
@@ -200,14 +344,28 @@ private:
       single_width,
       stereo_frame.rows);
 
-    // clone() ensures each image owns independent memory.
-    const cv::Mat left_image =
-      stereo_frame(left_roi).clone();
+    // clone() gives each output image independent storage.
+cv::Mat left_color =
+  stereo_frame(left_roi).clone();
 
-    const cv::Mat right_image =
-      stereo_frame(right_roi).clone();
+cv::Mat right_color =
+  stereo_frame(right_roi).clone();
 
-    // Use exactly the same timestamp for the stereo pair.
+
+cv::Mat left_image;
+cv::Mat right_image;
+
+cv::cvtColor(
+  left_color,
+  left_image,
+  cv::COLOR_BGR2GRAY);
+
+cv::cvtColor(
+  right_color,
+  right_image,
+  cv::COLOR_BGR2GRAY);
+
+    // Exactly the same timestamp is used for the stereo pair.
     const rclcpp::Time timestamp = now();
 
     std_msgs::msg::Header left_header;
@@ -218,28 +376,56 @@ private:
     right_header.stamp = timestamp;
     right_header.frame_id = right_frame_id_;
 
-    auto left_message =
-      cv_bridge::CvImage(
+ auto left_image_message =
+  cv_bridge::CvImage(
+  left_header,
+  sensor_msgs::image_encodings::MONO8,
+  left_image).toImageMsg();
+
+auto right_image_message =
+  cv_bridge::CvImage(
+  right_header,
+  sensor_msgs::image_encodings::MONO8,
+  right_image).toImageMsg();
+
+    auto left_camera_info = prepare_camera_info(
+      *left_camera_info_manager_,
       left_header,
-      sensor_msgs::image_encodings::BGR8,
-      left_image).toImageMsg();
+      single_width,
+      stereo_frame.rows,
+      "Left");
 
-    auto right_message =
-      cv_bridge::CvImage(
+    auto right_camera_info = prepare_camera_info(
+      *right_camera_info_manager_,
       right_header,
-      sensor_msgs::image_encodings::BGR8,
-      right_image).toImageMsg();
+      single_width,
+      stereo_frame.rows,
+      "Right");
 
-    left_publisher_->publish(*left_message);
-    right_publisher_->publish(*right_message);
+    left_image_publisher_->publish(*left_image_message);
+    left_camera_info_publisher_->publish(left_camera_info);
 
-    frame_counter_++;
+    right_image_publisher_->publish(*right_image_message);
+    right_camera_info_publisher_->publish(right_camera_info);
+
+    RCLCPP_INFO_THROTTLE(
+  get_logger(),
+  *get_clock(),
+  2000,
+  "timestamp image=%d.%09d info=%d.%09d",
+  left_image_message->header.stamp.sec,
+  left_image_message->header.stamp.nanosec,
+  left_camera_info.header.stamp.sec,
+  left_camera_info.header.stamp.nanosec
+);
+
+    ++frame_counter_;
 
     RCLCPP_INFO_THROTTLE(
       get_logger(),
       *get_clock(),
       5000,
-      "Publishing stereo images: frame=%lu, input=%dx%d, output=%dx%d",
+      "Publishing stereo pair: frame=%lu, input=%dx%d, output=%dx%d",
       static_cast<unsigned long>(frame_counter_),
       stereo_frame.cols,
       stereo_frame.rows,
@@ -255,13 +441,38 @@ private:
 
   std::string left_frame_id_;
   std::string right_frame_id_;
+
   std::string left_topic_;
   std::string right_topic_;
 
+  std::string left_camera_info_topic_;
+  std::string right_camera_info_topic_;
+
+  std::string left_camera_name_;
+  std::string right_camera_name_;
+
+  std::string left_camera_info_url_;
+  std::string right_camera_info_url_;
+
   cv::VideoCapture capture_;
 
-  rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr left_publisher_;
-  rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr right_publisher_;
+  rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr
+    left_image_publisher_;
+
+  rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr
+    right_image_publisher_;
+
+  rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr
+    left_camera_info_publisher_;
+
+  rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr
+    right_camera_info_publisher_;
+
+  std::unique_ptr<camera_info_manager::CameraInfoManager>
+    left_camera_info_manager_;
+
+  std::unique_ptr<camera_info_manager::CameraInfoManager>
+    right_camera_info_manager_;
 
   rclcpp::TimerBase::SharedPtr timer_;
 

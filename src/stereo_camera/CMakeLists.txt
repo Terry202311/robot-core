@@ -9,6 +9,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(cv_bridge REQUIRED)
+find_package(camera_info_manager REQUIRED)
 find_package(OpenCV REQUIRED)
 
 add_executable(stereo_camera_node
@@ -19,6 +20,7 @@ ament_target_dependencies(stereo_camera_node
   rclcpp
   sensor_msgs
   cv_bridge
+  camera_info_manager
 )
 
 target_include_directories(stereo_camera_node PRIVATE

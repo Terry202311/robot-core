@@ -1,0 +1,8 @@
+robot:
+  ros__parameters:
+
+    use_camera: true
+    use_imu: true
+    use_ekf: true
+    use_gps: false
+

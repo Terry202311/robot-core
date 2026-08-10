@@ -28,7 +28,9 @@ def generate_launch_description() -> LaunchDescription:
                 executable="stereo_camera_node",
                 name="stereo_camera_node",
                 output="screen",
-                parameters=[config_file],
+                parameters=[
+                    config_file
+                ],
             ),
         ]
     )

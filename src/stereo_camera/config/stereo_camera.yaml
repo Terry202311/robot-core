@@ -2,17 +2,29 @@ stereo_camera_node:
   ros__parameters:
     device: "/dev/video0"
 
-    # 当前先使用低分辨率模式：
-    # 拼接图 1280x400
-    # 单目图 640x400
+    # USB 3.0 高分辨率模式
+    # Side-by-side 输入：2560x800
+    # 单个相机输出：1280x800
     frame_width: 1280
     frame_height: 400
 
-    capture_fps: 60.0
-    publish_fps: 30.0
+    capture_fps: 30.0
+    publish_fps: 15.0
 
     left_frame_id: "camera_left_optical_frame"
     right_frame_id: "camera_right_optical_frame"
 
     left_topic: "left/image_raw"
     right_topic: "right/image_raw"
+
+    left_camera_info_topic: "left/camera_info"
+    right_camera_info_topic: "right/camera_info"
+
+    left_camera_name: "left_camera"
+    right_camera_name: "right_camera"
+
+    # 标定完成前保持为空。
+    # 将来示例：
+    left_camera_info_url: "file:///home/ubuntu/orp_ws/src/stereo_camera/config/left_camera.yaml"
+
+    right_camera_info_url: "file:///home/ubuntu/orp_ws/src/stereo_camera/config/right_camera.yaml"

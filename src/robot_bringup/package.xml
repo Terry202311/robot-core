@@ -1,10 +1,11 @@
 <?xml version="1.0"?>
 <package format="3">
-  <name>stereo_camera</name>
-  <version>0.2.0</version>
+
+  <name>robot_bringup</name>
+  <version>0.1.0</version>
 
   <description>
-    ROS2 driver for a side-by-side USB stereo camera with CameraInfo support.
+    OpenRobotPlatform robot startup package.
   </description>
 
   <maintainer email="openrobotplatform@example.com">
@@ -13,20 +14,24 @@
 
   <license>Apache-2.0</license>
 
+
   <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <depend>rclcpp</depend>
-  <depend>sensor_msgs</depend>
-  <depend>cv_bridge</depend>
-  <depend>camera_info_manager</depend>
 
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
 
-  <test_depend>ament_lint_auto</test_depend>
-  <test_depend>ament_lint_common</test_depend>
+
+  <exec_depend>robot_description</exec_depend>
+  <exec_depend>stereo_camera</exec_depend>
+  <exec_depend>wt901_driver</exec_depend>
+  <exec_depend>sensor_fusion</exec_depend>
+  <exec_depend>serial_bridge</exec_depend>
+  <exec_depend>mecanum_odometry</exec_depend>
+
 
   <export>
     <build_type>ament_cmake</build_type>
   </export>
+
 </package>
