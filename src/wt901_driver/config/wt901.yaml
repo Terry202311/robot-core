@@ -1,6 +1,9 @@
-wt901_node:
+wt901_driver:
+
   ros__parameters:
-    port: /dev/ttyUSB0
-    baudrate: 9600
-    frame_id: imu_link
-    topic_name: /imu/data_raw
+
+    port:
+      /dev/serial/by-id/usb-1a86_USB2.0-Serial-if00-port0
+
+    baudrate:
+      9600
