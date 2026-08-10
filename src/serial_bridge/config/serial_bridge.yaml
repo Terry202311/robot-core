@@ -1,6 +1,6 @@
 serial_bridge:
   ros__parameters:
-    port: "/dev/ttyACM0"
+    port: /dev/serial/by-id/usb-Arduino__www.arduino.cc__0042_850363135303511101D1-if00
     baudrate: 115200
     timeout: 0.02
     read_period: 0.01
